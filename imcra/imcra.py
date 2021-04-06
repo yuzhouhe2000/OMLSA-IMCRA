@@ -1,8 +1,29 @@
+# Python implementation of OMLSA 
+# By Yuzhou He
+# Reference: https://github.com/zhr1201/OMLSA-speech-enhancement/blob/master/myomlsa1_0.m
+
 import numpy as np
 import scipy
-from utils import *
 import matplotlib.pyplot as plt
 import time
+
+
+def reformat(input):
+    input = input.reshape(len(input),1)
+    return input
+
+def reverse(lst):
+    return [ele for ele in reversed(lst)]
+
+def find_nonzero(input):
+    return [i for i, e in enumerate(input) if e != 0]
+
+def expint(v):
+    return np.real(-scipy.special.expi(-v)-np.pi*1j)
+
+def circular_shift(x,t):
+    return [x[t:len(x)], x[0:t]]
+
 
 def imcra(input,fs):
     # plt.plot(input)
@@ -112,23 +133,18 @@ def imcra(input,fs):
 
 
         '''instant SNR'''  
-        gamma = np.divide(Ya2 ,clipper(lambda_d, 1e-10,"max"))
+        gamma = np.divide(Ya2 ,np.maximum(lambda_d, 1e-10))
         
         
         ''' update smoothed SNR, eq.18, where eta_2term = GH1 .^ 2 .* gamma''' 
-        eta = alpha_eta * eta_2term + (1-alpha_eta) * clipper((gamma-1), 0,"max")
+        eta = alpha_eta * eta_2term + (1-alpha_eta) * np.maximum((gamma-1), 0)
 
-
-        
-        eta = clipper(eta, eta_min,"max")
+        eta = np.maximum(eta, eta_min)
         v = np.divide(gamma * eta, (1+eta))
-
-        
 
         GH1 = np.divide(eta,(1+eta))* np.exp(0.5* expint(v))
         
         S = alpha_s * S + (1-alpha_s) * Sf
-        
         
         if(loop_i<(frame_length+14*frame_move)):
             Smin = S
@@ -141,7 +157,6 @@ def imcra(input,fs):
     
         gama_min = np.divide((Ya2 / Bmin),Smin)
         zeta = np.divide(S/Bmin,Smin)
-
 
         I_f = [0]*N_eff
 
@@ -159,9 +174,7 @@ def imcra(input,fs):
         
         
         Sft = St
-        
         idx = find_nonzero(conv_I)
-        
         I_f = reformat(np.array(I_f))
 
         '''eq. 26'''
@@ -222,8 +235,6 @@ def imcra(input,fs):
         lambda_d = lambda_dav * beta
 
         
-        
-
         # # loop_i = loop_i + frame_move
         # # TODO: not fixed
         # if l_mod_lswitch==Vwin:
@@ -247,10 +258,10 @@ def imcra(input,fs):
 
         l_mod_lswitch = l_mod_lswitch + 1
 
-        gamma = np.divide(Ya2 , clipper(lambda_d, 1e-10,"max")) 
+        gamma = np.divide(Ya2 , np.maximum(lambda_d, 1e-10)) 
         '''update instant SNR'''
         
-        eta = alpha_eta * eta_2term + (1-alpha_eta) * clipper(gamma-1, 0,"max")
+        eta = alpha_eta * eta_2term + (1-alpha_eta) * np.maximum(gamma-1, 0)
         '''update smoothed SNR, eq. 32 where eta_2term = GH1 .^ 2 .* gamma '''
 
         for i in range(0,N_eff):
@@ -259,10 +270,9 @@ def imcra(input,fs):
 
         v = np.divide(gamma * eta , (1+eta))
 
-
         GH1 = np.divide(eta , (1+eta))* np.exp(0.5 * expint(v))
         
-        G = element_wise_power(GH1 , phat) * np.power(GH0 , (1-phat))
+        G = np.power(GH1 , phat) * np.power(GH0 , (1-phat))
         
         eta_2term = np.power(GH1 , 2) * gamma  
         '''eq. 18'''
@@ -270,7 +280,7 @@ def imcra(input,fs):
         X = np.concatenate((np.zeros((3,1)), (G[3:N_eff-1])*(Y[3:N_eff-1]),[[0]]))
 
         X_2 = X[1:N_eff-1]
-        X_2 = Reverse(X_2)
+        X_2 = reverse(X_2)
         X_other_half = np.conj(X_2) 
         X = np.concatenate((X,X_other_half))
 
@@ -279,11 +289,8 @@ def imcra(input,fs):
         X = X.reshape(len(X),)
         temp = np.real(np.fft.ifft(X))
 
-        # temp = reformat_ifft(temp) 
-
         frame_result = np.power(Cwin,2) * win * temp
         frame_result = frame_result.reshape(len(frame_result),1)
-
 
         frame_out = frame_out + frame_result
 
@@ -299,5 +306,3 @@ def imcra(input,fs):
     plt.plot(y_out_time)
     plt.show()
     return (y_out_time)
-    
-
