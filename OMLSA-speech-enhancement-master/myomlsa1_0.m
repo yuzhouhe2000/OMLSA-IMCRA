@@ -1,3 +1,6 @@
+
+
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Speech enhancement using OMLSA
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -31,7 +34,7 @@ y_out_time = zeros(data_length, 1);
 % window function
 win = hamming(frame_length);
 % find a normalization factor for the window
-win2 = win.^2;
+win2 = win .^ 2;
 W0 = win2(1:frame_move);
 for k = frame_move:frame_move:frame_length-1
     swin2 = lnshift(win2,k);
@@ -68,16 +71,17 @@ while(loop_i+frame_length<data_length)
         frame_in = [frame_in(frame_move+1:end); y_in_time(loop_i:loop_i+frame_move-1)];
     end
     frame_out = [frame_out(frame_move+1:end); zeros(frame_move,1)];
-    Y = fft(frame_in.*win);  
-%     Y = mfcc(frame_in.*win,fs); 
+    Y = fft(frame_in.*win);     
     Ya2 = abs(Y(1:N_eff)) .^ 2;  % spec estimation using single frame info.
     Sf = conv(win_freq, Ya2);  % frequency smoothing 
+    
     Sf = Sf(f_win_length+1:N_eff+f_win_length);  
     
     if(loop_i==1)   % initialization
         lambda_dav = Ya2;  % expected noise spec
         lambda_d = Ya2;  % modified expected noise spec
         gamma = 1;  % instant SNR estimation
+
         Smin = Sf;  % noise estimation spec value
         S = Sf;  % spec after time smoothing
         St = Sf;  % Sft:smoothing results using speech abscent probability
@@ -92,10 +96,17 @@ while(loop_i+frame_length<data_length)
     eta = alpha_eta * eta_2term + (1-alpha_eta) * max(gamma-1, 0);  % update smoothed SNR, eq.18, where eta_2term = GH1 .^ 2 .* gamma 
     eta = max(eta, eta_min);
     v = gamma .* eta ./ (1+eta);  
+    
+    
+   
+    
     GH1 = eta ./ (1+eta).*exp(0.5*expint(v));
-    loop_i = loop_i +  frame_length;
-
+  
     S = alpha_s * S + (1-alpha_s) * Sf;
+    
+    
+    
+%     So far ok
     if(loop_i<(frame_length+14*frame_move))
         Smin = S;
         Smin_sw = S;
@@ -104,14 +115,16 @@ while(loop_i+frame_length<data_length)
         Smin_sw = min(Smin_sw, S);
     end
     
-    
+  
     gama_min = Ya2 / Bmin ./ Smin;
     zeta = S / Bmin ./ Smin;
+    
     I_f = double(gama_min<gama0 & zeta<zeta0);
     conv_I = conv(win_freq, I_f);  % amoothing
     conv_I = conv_I(f_win_length+1:N_eff+f_win_length);
-        
+
     Sft = St;
+    
     idx = find(conv_I);   % eq. 26
     if ~isempty(idx)
             conv_Y = conv(win_freq, I_f.*Ya2);  % eq. 26
@@ -119,6 +132,11 @@ while(loop_i+frame_length<data_length)
             Sft(idx) = conv_Y(idx) ./ conv_I(idx);
     end
     St=alpha_s*St+(1-alpha_s)*Sft;  % updated smoothed spec eq. 27
+    
+    
+    
+    
+    
     
     if(loop_i<(frame_length+14*frame_move))
         Smint = St;
@@ -132,17 +150,25 @@ while(loop_i+frame_length<data_length)
     
     gamma_mint = Ya2 / Bmin ./ Smint;
     zetat = S / Bmin ./ Smint;
+    
+    
+    
     qhat = ones(N_eff, 1);  % eq. 29 speech absence probability
     phat = zeros(N_eff, 1);  % eq. 29 init p(speech active|gama)
 
     idx = find(gamma_mint>1 & gamma_mint<gama1 & zetat<zeta0);  % eq. 29
+    
     qhat(idx) = (gama1-gamma_mint(idx)) / (gama1-1);
     qhat(gamma_mint>=gama1 | zetat>=zeta0) = 0;
+    
+    
+    
     phat = 1 ./ (1+qhat./(1-qhat).*(1+eta).*exp(-v));  % eq. 7
     phat(gamma_mint>=gama1 | zetat>=zeta0) = 1;
     alpha_dt = alpha_d + (1-alpha_d) * phat; 
     lambda_dav = alpha_dt .* lambda_dav + (1-alpha_dt) .* Ya2;  
     lambda_d = lambda_dav * beta;
+
     
     
     if l_mod_lswitch==Vwin  % reinitiate every Vwin frames 
@@ -159,39 +185,63 @@ while(loop_i+frame_length<data_length)
             Smint_sw=St;   
         end
     end
+
+
     l_mod_lswitch = l_mod_lswitch + 1;
     
     gamma = Ya2 ./ max(lambda_d, 1e-10);  % update instant SNR
     eta = alpha_eta * eta_2term + (1-alpha_eta) * max(gamma-1, 0);  % update smoothed SNR, eq. 32 where eta_2term = GH1 .^ 2 .* gamma 
-    eta = max(eta, eta_min);
-    v = gamma .* eta ./ (1+eta);  
+    
+   
+    
+    %     eta = max(eta, eta_min);
+%     eta(2)
+    v = gamma .* eta ./ (1+eta); 
+
     GH1 = eta ./ (1+eta).*exp(0.5*expint(v));
-     
-    G = GH1 .^ phat .* GH0 .^ (1-phat);
+    
+    G = (GH1 .^ phat) .* (GH0 .^ (1-phat));
+    
     eta_2term = GH1 .^ 2 .* gamma;  % eq. 18
     
     X = [zeros(3,1); G(4:N_eff-1) .* Y(4:N_eff-1); 0];
+%     conj(X(N_eff-1:-1:2));
+
     X(N_eff+1:frame_length) = conj(X(N_eff-1:-1:2));  % extend the anti-symmetric range of the spectum
     frame_result = Cwin^2*win.*real(ifft(X));
     
     frame_out = frame_out + frame_result;
+    
+%     while(1)
+%     end
+    
     if(loop_i==1)
         y_out_time(loop_i:loop_i+frame_move-1) = frame_out(1:frame_move);
         loop_i = loop_i + frame_length;
     else
         y_out_time(loop_i-frame_overlap:loop_i+frame_move-1-frame_overlap) = frame_out(1:frame_move);
         loop_i = loop_i + frame_move;
-    end
+    end 
 end
+
+
+
+
 audiowrite('example_out.wav', y_out_time, fs);
 audiowrite('example_in.wav', y_in_time, fs);
  
-% windowOverlap = [];
-% freqRange = 1:20000;
-% 
-% subplot(2,1,1)
-% % spectrogram(y_in_time, 128, windowOverlap, freqRange, fs, 'yaxis');
-% plot(y_in_time)
-% subplot(2,1,2)
-% % spectrogram(y_out_time, 128, windowOverlap, freqRange, fs, 'yaxis');
-% plot(y_out_time)
+windowOverlap = [];
+freqRange = 1:20000;
+
+
+[special,fs0] = audioread('out2.wav');
+
+subplot(3,1,1)
+% spectrogram(y_in_time, 128, windowOverlap, freqRange, fs, 'yaxis');
+plot(y_in_time)
+subplot(3,1,2)
+% spectrogram(y_out_time, 128, windowOverlap, freqRange, fs, 'yaxis');
+plot(y_out_time)
+subplot(3,1,3)
+plot(special*0.1)
+

@@ -2,7 +2,7 @@ from pydub import AudioSegment
 import librosa
 from imcra import imcra
 from scipy.io.wavfile import write
-
+import numpy as np
 fs = 16000
 dst = "in.wav"
 out_dst = "out.wav"

@@ -1,22 +1,20 @@
 import numpy as np
+import scipy
 
 
 def reformat(input):
     input = input.reshape(len(input),1)
     return input
 
-def mixmin(a,b):
-    return min(np.amin(a),np.amin(b))
-
 def clipper(a,b,command):
     if command == "max":
         for i in range(0, len(a)):
             if (a[i] < b):
-                a[i] == b
+                a[i] = b
     if command == "min":
         for i in range(0, len(a)):
             if (a[i] > b):
-                a[i] == b
+                a[i] = b
     return a
 
 def element_wise_power(a,b):
@@ -41,11 +39,9 @@ def find_nonzero(input):
             output.append(i)
     return output
 
-def lnshift(x,t):
-    length = len(x)
-    if length > 1:
-        y = [x[t:length], x[0:t]]
-    else:
-        length = len(x[0])
-        y = np.concatenate((x[t:length],x[0:t]))
-    return y
+def expint(v):
+    return np.real(-scipy.special.expi(-v)-np.pi*1j)
+
+def circular_shift(x,t):
+    return [x[t:len(x)], x[0:t]]
+
