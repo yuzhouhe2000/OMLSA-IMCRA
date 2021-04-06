@@ -209,7 +209,8 @@ while(loop_i+frame_length<data_length)
 
     X(N_eff+1:frame_length) = conj(X(N_eff-1:-1:2));  % extend the anti-symmetric range of the spectum
     frame_result = Cwin^2*win.*real(ifft(X));
-    
+   
+ 
     frame_out = frame_out + frame_result;
     
 %     while(1)

@@ -72,7 +72,7 @@ def imcra(input,fs):
 
         frame_out = np.concatenate((frame_out[frame_move:], np.zeros((frame_move,1))))
 
-        Y = np.fft.fft(frame_in*win);  
+        Y = np.fft.fft(frame_in*win)
         Y = reformat(Y)
 
         Ya2 = np.power(abs(Y[0:N_eff]), 2)  
@@ -152,7 +152,7 @@ def imcra(input,fs):
                 I_f[i] = 0
 
         # leaves
-        conv_I = np.convolve(win_freq, I_f); 
+        conv_I = np.convolve(win_freq, I_f)
         conv_I = reformat(conv_I)
         '''smooth'''
         conv_I = conv_I[f_win_length:N_eff+f_win_length]
@@ -250,7 +250,7 @@ def imcra(input,fs):
         gamma = np.divide(Ya2 , clipper(lambda_d, 1e-10,"max")) 
         '''update instant SNR'''
         
-        eta = alpha_eta * eta_2term + (1-alpha_eta) * clipper(gamma-1, 0,"max");  
+        eta = alpha_eta * eta_2term + (1-alpha_eta) * clipper(gamma-1, 0,"max")
         '''update smoothed SNR, eq. 32 where eta_2term = GH1 .^ 2 .* gamma '''
 
         for i in range(0,N_eff):
@@ -276,16 +276,16 @@ def imcra(input,fs):
 
         # TODO:the problem is here
         '''extend the anti-symmetric range of the spectum'''
+        X = X.reshape(len(X),)
         temp = np.real(np.fft.ifft(X))
-        temp = reformat_ifft(temp) 
+
+        # temp = reformat_ifft(temp) 
+
         frame_result = np.power(Cwin,2) * win * temp
         frame_result = frame_result.reshape(len(frame_result),1)
-        # print(Cwin)
+
 
         frame_out = frame_out + frame_result
-
-        
-        # return
 
         if(loop_i==0):
             y_out_time[loop_i:loop_i+frame_move] = frame_out[0:frame_move]
