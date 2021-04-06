@@ -284,7 +284,6 @@ def imcra(input,fs):
         X_other_half = np.conj(X_2) 
         X = np.concatenate((X,X_other_half))
 
-        # TODO:the problem is here
         '''extend the anti-symmetric range of the spectum'''
         X = X.reshape(len(X),)
         temp = np.real(np.fft.ifft(X))
