@@ -13,18 +13,18 @@ out_dst = "out.wav"
 
 y1, fs = librosa.load(input1, sr=fs)
 y2, fs = librosa.load(input2, sr=fs)
-noise = np.random.normal(0,0.15,len(y1))
+white_noise = np.random.normal(0,0.15,len(y1))
 
 # y_combine = y1 + y2[0:len(y1)]*0.1
-y_combine = y1 + noise
+y_combine = y1 + white_noise
 
 # plt.plot(y_combine)
 # plt.show()
 
 write(input_dst,16000,y_combine) 
 
-# Turn plot on if you want compare spectrograms
-output = omlsa(y_combine,fs, plot = False)
-write(out_dst,16000,output) 
+# choose between f (frequency domain plot), t (time domain plot), or None
+output = omlsa(y_combine,fs, plot = "f")
 
+write(out_dst,16000,output) 
 print("done")
