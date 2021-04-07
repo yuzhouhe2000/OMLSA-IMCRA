@@ -1,13 +1,11 @@
 # Python implementation of OMLSA 
 # By Yuzhou He
 # Reference: https://github.com/zhr1201/OMLSA-speech-enhancement/blob/master/myomlsa1_0.m
-
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
 import time
-import librosa
-import librosa.display
+import scipy.special
 
 # Some helper functions
 
@@ -15,14 +13,6 @@ import librosa.display
 def reformat(input):
     input = input.reshape(len(input),1)
     return input
-
-# Return a reversed array
-def reverse(lst):
-    return [ele for ele in reversed(lst)]
-
-# Return the index non-zero element
-def find_nonzero(input):
-    return [i for i, e in enumerate(input) if e != 0]
 
 # Return real part of exponential integral, same as matlab expint()
 def expint(v):
@@ -45,7 +35,7 @@ def omlsa(input,fs,plot = None):
     frame_out = np.zeros((frame_length, 1))
     frame_result = np.zeros((frame_length, 1))
     y_out_time = np.zeros((data_length, 1))
-    win = scipy.signal.hamming(frame_length)
+    win = np.hamming(frame_length)
     '''normalization of window'''
     win2 = np.power(win,2)
     W0 = win2[0:frame_move]
@@ -101,11 +91,11 @@ def omlsa(input,fs,plot = None):
 
         Ya2 = np.power(abs(Y[0:N_eff]), 2)  
         '''spec estimation using single frame info.'''
-
-        Sf = np.convolve(win_freq.flatten(), Ya2.flatten())  
-        Sf = reformat(Sf)
+        Sf = Ya2
+        # Sf = np.convolve(win_freq.flatten(), Ya2.flatten())  
+        # Sf = reformat(Sf)
         '''frequency smoothing '''
-        Sf = Sf[f_win_length:N_eff+f_win_length]  
+        # Sf = Sf[f_win_length:N_eff+f_win_length]  
 
         '''initialization'''
         if (loop_i==0):         
@@ -160,33 +150,42 @@ def omlsa(input,fs,plot = None):
         zeta = np.divide(S/Bmin,Smin)
 
         I_f = [0]*N_eff
-
+        
+        
+        # about 0.2 second
         for i in range(0,N_eff):
             if(gama_min[i] <gama0 and zeta[i] < zeta0):
                 I_f[i] = 1
             else:
                 I_f[i] = 0
+                
+        
 
-        # leaves
+        # conv_I = I_f
         conv_I = np.convolve(win_freq, I_f)
         conv_I = reformat(conv_I)
         '''smooth'''
         conv_I = conv_I[f_win_length:N_eff+f_win_length]
-        
+
+
         Sft = St
-        idx = find_nonzero(conv_I)
+        # idx = find_nonzero(conv_I)
         I_f = reformat(np.array(I_f))
-
+        
         '''eq. 26'''
-        if idx != []:
-            for i in idx:
-                conv_Y = np.convolve(win_freq.flatten(), (I_f*Ya2).flatten())
-                
-                conv_Y = reformat(conv_Y) 
-                '''eq. 26'''
-                conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
-                Sft[i] = np.divide(conv_Y[i],conv_I[i])
 
+            
+        conv_Y = np.convolve(win_freq.flatten(), (I_f*Ya2).flatten())
+        conv_Y = reformat(conv_Y) 
+        '''eq. 26'''
+        conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
+
+        # about 0.4s
+        for i in range(0,N_eff):
+            if conv_I[i] != 0:
+                Sft[i] = np.divide(conv_Y[i],conv_I[i])
+        
+        
         St=alpha_s*St+(1-alpha_s)*Sft
         '''updated smoothed spec eq. 27'''
         
@@ -205,27 +204,29 @@ def omlsa(input,fs,plot = None):
         '''eq. 29 init p(speech active|gama)'''
         
         temp = [0]*N_eff
+
+        
+        # about 0.3s
         for i in range(0,N_eff):
             if (gamma_mint[i]>1 and gamma_mint[i]<gama1 and zetat[i]<zeta0):
                 qhat[i] = (gama1-gamma_mint[i]) / (gama1-1)
-
-            if gamma_mint[i] >= gama1 or zetat[i] >= zeta0:
+            elif gamma_mint[i] >= gama1 or zetat[i] >= zeta0:
                 qhat[i] = 0
 
         phat = np.divide(1,(1+np.divide(qhat,(1-qhat))*(1+eta) * np.exp(-v)))
 
+        # about 0.2s
         for i in range(0,N_eff):  
             if (gamma_mint[i] >=gama1 or zetat[i] >=zeta0):
                 phat[i] = 1
-
+        
         alpha_dt = alpha_d + (1-alpha_d) * phat
 
         lambda_dav = alpha_dt * lambda_dav + (1-alpha_dt) * Ya2
 
         lambda_d = lambda_dav * beta
 
-        
-        # loop_i = loop_i + frame_move
+
         if l_mod_lswitch==Vwin:
             '''reinitiate every Vwin frames'''
             l_mod_lswitch=0
@@ -250,9 +251,11 @@ def omlsa(input,fs,plot = None):
         eta = alpha_eta * eta_2term + (1-alpha_eta) * np.maximum(gamma-1, 0)
         '''update smoothed SNR, eq. 32 where eta_2term = GH1 .^ 2 .* gamma '''
 
+        # about 0.1s
         for i in range(0,N_eff):
             if eta[i] < eta_min:
                 eta[i] = eta_min
+        
 
         v = np.divide(gamma * eta , (1+eta))
 
@@ -266,7 +269,7 @@ def omlsa(input,fs,plot = None):
         X = np.concatenate((np.zeros((3,1)), (G[3:N_eff-1])*(Y[3:N_eff-1]),[[0]]))
 
         X_2 = X[1:N_eff-1]
-        X_2 = reverse(X_2)
+        X_2 = X_2[::-1]
         X_other_half = np.conj(X_2) 
         X = np.concatenate((X,X_other_half))
 
