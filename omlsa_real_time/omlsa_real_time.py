@@ -33,11 +33,9 @@ def circular_shift(x,t):
     return [x[t:len(x)], x[0:t]]
 
 # OMLSA + IMCRA algorithm
-def omlsa(input,fs,plot = False):
+def omls(input,fs,frame_length,frame_move):
     start = time.time()
     data_length = len(input)
-    frame_length = 512
-    frame_move = 128
     frame_overlap = frame_length - frame_move
     N_eff = int(frame_length / 2 + 1)
     loop_i = 0
@@ -288,15 +286,5 @@ def omlsa(input,fs,plot = False):
 
     y_out_time = y_out_time
     print(time.time()-start)
-    
-    if plot == True:
-        NFFT = 256
-        fig, axes = plt.subplots(nrows=2, ncols=1)
-        Pxx, freqs, bins, im = axes[0].specgram(input,NFFT=NFFT, Fs=fs, noverlap = NFFT/2, vmin= -80)
-        y_out_time_reshape  = y_out_time.reshape(len(y_out_time),)
-        Pxx, freqs, bins, im = axes[1].specgram(y_out_time_reshape,NFFT=NFFT, Fs=fs, noverlap= NFFT/2,vmin= -80)
-        fig.subplots_adjust(right=0.8)
-        cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-        fig.colorbar(im, cax=cbar_ax)
-        plt.show()
+
     return (y_out_time)

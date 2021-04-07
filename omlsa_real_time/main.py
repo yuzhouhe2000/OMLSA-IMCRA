@@ -23,8 +23,10 @@ y_combine = y1 + noise
 
 write(input_dst,16000,y_combine) 
 
+frame_length = 512
+frame_move = 128
 # Turn plot on if you want compare spectrograms
-output = omlsa(y_combine,fs, plot = False)
+output = omlsa(y_combine,fs,frame_length,frame_move)
 write(out_dst,16000,output) 
 
 print("done")
