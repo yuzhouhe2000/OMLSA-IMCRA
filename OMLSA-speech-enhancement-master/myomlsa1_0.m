@@ -173,7 +173,7 @@ while(loop_i+frame_length<data_length)
     
     if l_mod_lswitch==Vwin  % reinitiate every Vwin frames 
         l_mod_lswitch=0;
-        if loop_i == Vwin * frame_move + 1 +frame_overlap;
+        if loop_i == Vwin * frame_move + 1 +frame_overlap
             SW=repmat(S,1,Nwin);
             SWt=repmat(St,1,Nwin);
         else
