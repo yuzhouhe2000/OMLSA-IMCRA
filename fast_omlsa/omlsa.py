@@ -18,6 +18,8 @@ def expint(v):
 def circular_shift(x,t):
     return [x[t:len(x)], x[0:t]]
 
+
+# Faster for loop usinig numba
 @njit(fastmath=True, cache=True)
 def fast_loop1(N_eff,conv_Y,conv_I,Sft):
     for i in range(0,N_eff):
@@ -276,14 +278,9 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
                 Smint_sw=St;   
 
         l_mod_lswitch = l_mod_lswitch + 1
-
-        
-
         
         gamma = np.divide(Ya2 , np.maximum(lambda_d, 1e-10)) 
         '''update instant SNR'''
-        
-
 
         eta = alpha_eta * eta_2term + (1-alpha_eta) * np.maximum(gamma-1, 0)
         '''update smoothed SNR, eq. 32 where eta_2term = GH1 .^ 2 .* gamma '''
