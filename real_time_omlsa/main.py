@@ -42,6 +42,7 @@ def audio_input():
         # TODO: NEED to pass the overflow and underflow information
         frame, overflow = stream_in.read(frame_move)
         buffer.append(frame)
+        
     stream_in.stop()
     return ('', 204)
 
@@ -61,8 +62,8 @@ def denoiser_output():
                 del(buffer[0])
             frame = buffer[0]
             del(buffer[0])
-            output = omlsa_streamer(frame,sample_rate, frame_length, frame_move)
-            stream_out.write(output)
+            output = omlsa_streamer(frame,sample_rate, frame_length, frame_move,preprocess=None)
+            # stream_out.write(output)
     stream_out.stop()
 
 threads = []

@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import time
 from utils import *
 
-
 f_win_length = 1
 win_freq = np.array([0.25, 0.5, 0.25])
 alpha_eta = 0.92
@@ -22,38 +21,51 @@ zeta0 = 1.67
 Bmin = 1.66
 Vwin = 15
 Nwin = 8
+loop_i = 0
+
+# Assume frame length = 256, frame_move = 128. Can change here
+frame_length = 256
+frame_move =128
+N_eff = int(frame_length / 2 + 1)
+frame_overlap = frame_length - frame_move
+win = np.hamming(frame_length)
+win = win / (np.mean(np.power(win,2)) ** 0.5)
+Cwin = sum(np.power(win,2)) ** 0.5
+win = win / Cwin
+N_eff = int(frame_length / 2 + 1)
+
+frame_buffer = np.array([])
+
+def test_function(buffer):
+    while(1):
+        print(buffer)
 
 
-def omlsa_streamer(frame_in,fs,frame_length,frame_move,plot = None,preprocess = None,high_cut = 15000):
+def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = None,high_cut = 15000):
+    global loop_i  
+    global frame_buffer
+
+    frame_buffer = np.append(frame_buffer,frame)  
     start = time.time()
-    input = bandpass(frame_in,preprocess,high_cut,fs)  # bandpass the signal
+    input = bandpass(frame,preprocess,high_cut,fs)  # bandpass the signal
 
     ############### Initialize the data ################
+    # data_length = len(frame_buffer)
     data_length = len(input)
-    frame_overlap = frame_length - frame_move
-    N_eff = int(frame_length / 2 + 1)
-    loop_i = 0
+    
     frame_in = np.zeros((frame_length, ))
     frame_out = np.zeros((frame_length, ))
     frame_result = np.zeros((frame_length, ))
     y_out_time = np.zeros((data_length, ))
 
-
-    win = np.hamming(frame_length)
-    win = win / (np.mean(np.power(win,2)) ** 0.5)
-    Cwin = sum(np.power(win,2)) ** 0.5
-    win = win / Cwin
     l_mod_lswitch = 0
     #################### Main Loop ####################
     '''OMLSA LOOP'''
     '''For all time frames'''
-    while(loop_i+frame_length < data_length):
+    while(loop_i+frame_length <= data_length):
         '''if is first iteration, initialize all the variables'''
-        if(loop_i == 0):
-            frame_in = input[0:frame_length]
-        else:
-            '''move the frame by step = frame_moove'''
-            frame_in = np.concatenate((frame_in[frame_move:], input[loop_i:loop_i+frame_move]))
+        print("yes")
+        frame_in = input
 
         frame_out = np.concatenate((frame_out[frame_move:], np.zeros((frame_move,))))
 
