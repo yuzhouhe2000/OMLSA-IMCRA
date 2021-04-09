@@ -58,25 +58,7 @@ l_mod_lswitch = 0
 
 
 def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = None,high_cut = 15000):
-    global loop_i  
-    global frame_buffer
-    global frame_out_buffer
-    global frame_out
-    global frame_in
-    global frame_result
-    global y_out_time
-    global l_mod_lswitch  
-    global lambda_d
-    global eta_2term
-    global S
-    global St
-    global lambda_dav
-    global Smin
-    global Smin_sw
-    global Smint_sw
-    global Smint
-
-
+    global loop_i,frame_buffer,frame_out_buffer,frame_out,frame_in,frame_result,y_out_time,l_mod_lswitch,lambda_d,eta_2term,S,St,lambda_dav,Smin,Smin_sw,Smint_sw,Smint
     start = time.time()
     input = bandpass(frame,preprocess,high_cut,fs)  # bandpass the signal
     input = input.reshape(frame_move,)
@@ -90,6 +72,7 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = Non
         return frame
 
     else:
+        # loop_i = 23
         frame_in = frame_buffer[(loop_i-frame_move):(loop_i-frame_move)+frame_length]
         frame_out = np.concatenate((frame_out[frame_move:], np.zeros((frame_move,))))
         
@@ -101,44 +84,21 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = Non
         
         '''initialization'''
         if (loop_i==frame_move):         
-            
-            ''' 
-            lambda_dav = expected noise spec
-            lambda_d = modified expected noise spec
-            '''
-            
             lambda_dav = lambda_d = Ya2  
-            
-            ''' instant SNR estimation'''
             gamma = 1  
-            
-            '''
-            S = spec after time smoothing
-            Smin = noise estimation spec value
-            Sft = smoothing results using speech abscent probability
-            Smint = min value get from St
-            Smin_sw = auxiliary variable for finding min
-            '''
-            S = Smin = St = Smint = Smin_sw = Smint_sw = Sf  
-            '''spec gain'''
             GH1 = 1  
-            
             eta_2term = np.power(GH1,2) * gamma
+            S = Smin = St = Smint = Smin_sw = Smint_sw = Sf  
             
-
         # return
         '''instant SNR'''  
         gamma = np.divide(Ya2 ,np.maximum(lambda_d, 1e-10))
-        
-        
+    
         ''' update smoothed SNR, eq.18, where eta_2term = GH1 .^ 2 .* gamma''' 
         eta = alpha_eta * eta_2term + (1-alpha_eta) * np.maximum((gamma-1), 0)
-        
         eta = np.maximum(eta, eta_min)
         v = np.divide(gamma * eta, (1+eta))
-
         GH1 = np.divide(eta,(1+eta))* np.exp(0.5* expint(v))
-        
         S = alpha_s * S + (1-alpha_s) * Sf
         
         if(loop_i<(frame_length+14*frame_move)):
@@ -151,25 +111,16 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = Non
 
         gamma_min = np.divide((Ya2 / Bmin),Smin)
         zeta = np.divide(S/Bmin,Smin)
-
         I_f = find_I_f(N_eff,gamma0,zeta,zeta0,gamma_min)
-
         conv_I = np.convolve(win_freq, I_f)
-        
-        '''smooth'''
         conv_I = conv_I[f_win_length:N_eff+f_win_length]
         
         '''eq. 26'''       
         conv_Y = np.convolve(win_freq.flatten(), (I_f*Ya2).flatten())
-
-        '''eq. 26'''
         conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
-
         Sft = find_Sft(N_eff,conv_Y,conv_I,St)
-             
-        St=alpha_s*St+(1-alpha_s)*Sft
         '''updated smoothed spec eq. 27'''
-        
+        St=alpha_s*St+(1-alpha_s)*Sft
         if(loop_i<(frame_length+14*frame_move)):
             Smint = St
             Smint_sw = St
@@ -179,15 +130,9 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = Non
         
         gamma_mint = np.divide(Ya2/Bmin, Smint)
         zetat = np.divide(S/Bmin, Smint)
-        
         '''eq. 29 speech absence probability'''
-        
-        '''eq. 29 init p(speech active|gama)'''
-        
         temp = [0]*N_eff
-
         qhat = find_qhat(N_eff,gamma_mint,gamma1,zeta0,zetat)
-
         phat = find_phat(N_eff,gamma_mint,gamma1,zetat,zeta0,v,eta,qhat)
         alpha_dt = alpha_d + (1-alpha_d) * phat
         lambda_dav = alpha_dt * lambda_dav + (1-alpha_dt) * Ya2
@@ -218,19 +163,12 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = Non
         # print(eta_2term)
         # return
         eta = update_eta(N_eff,eta,eta_min,alpha_eta,eta_2term,gamma)
-        
         v = np.divide(gamma * eta , (1+eta))
-
         GH1 = np.divide(eta , (1+eta))* np.exp(0.5 * expint(v))
-
         G = np.power(GH1 , phat) * np.power(GH0 , (1-phat))
-        
         eta_2term = np.power(GH1 , 2) * gamma  
-        
         '''eq. 18'''
-        
         X = np.concatenate((np.zeros((3,)), (G[3:N_eff-1])*(Y[3:N_eff-1]),[0]))
-        
         X_2 = X[1:N_eff-1]
         X_2 = X_2[::-1]
         X_other_half = np.conj(X_2) 
