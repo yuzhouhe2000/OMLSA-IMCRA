@@ -16,7 +16,7 @@ out_dst = "out.wav"
 
 buffer = []
 LIVE = 1
-sample_rate = 16_000
+sample_rate = 44100
 frame_length = 256
 frame_move = 128
 
@@ -56,7 +56,6 @@ def denoiser_output():
         device=None,
         samplerate=sample_rate,
         channels=channels_out)
-
     stream_out.start()
     while(1):
         while (LIVE == 1):
@@ -65,16 +64,16 @@ def denoiser_output():
                     del(buffer[0])
                 frame = buffer[0]
                 del(buffer[0])
-                output = omlsa_streamer(frame,sample_rate, frame_length, frame_move,preprocess=None)
+                print(len(buffer))
+                output = omlsa_streamer(frame,sample_rate, frame_length, frame_move,preprocess="butter")
                 stream_out.write(output.astype(np.float32))
         while(LIVE == 0):
             if buffer != []:
                 while len(buffer) > 10:
                     del(buffer[0])
                 frame = buffer[0]
-                del(buffer[0])
+                del(buffer[0])      
                 stream_out.write(frame)
-
     stream_out.stop()
 
 def switch():

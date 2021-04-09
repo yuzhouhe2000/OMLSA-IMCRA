@@ -48,7 +48,6 @@ N_eff = int(frame_length / 2 + 1)
 data_length = frame_length
 partition = frame_length/frame_move
 frame_buffer = np.zeros((0, ))
-frame_out_buffer = np.zeros((0, ))
 frame_in = np.zeros((frame_length, ))
 frame_out = np.zeros((frame_length, ))
 
@@ -57,25 +56,30 @@ y_out_time = np.zeros((data_length, ))
 l_mod_lswitch = 0
 
 
-def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = None,high_cut = 15000):
-    global loop_i,frame_buffer,frame_out_buffer,frame_out,frame_in,frame_result,y_out_time,l_mod_lswitch,lambda_d,eta_2term,S,St,lambda_dav,Smin,Smin_sw,Smint_sw,Smint
+def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = None,high_cut = 12000):
+    global loop_i,frame_buffer,frame_out,frame_in,frame_result,y_out_time,l_mod_lswitch,lambda_d,eta_2term,S,St,lambda_dav,Smin,Smin_sw,Smint_sw,Smint
     start = time.time()
     input = bandpass(frame,preprocess,high_cut,fs)  # bandpass the signal
     input = input.reshape(frame_move,)
-    frame_buffer = np.concatenate((frame_buffer,input))
+    
     #################### Core Algorithm ####################
 
     '''OMLSA LOOP'''
     '''For all time frames'''
-    if loop_i < (frame_length-frame_move):
-        loop_i  = loop_i + frame_move
+    if loop_i == 0:
+        loop_i  = loop_i + 1
+        frame_buffer = np.concatenate((frame_buffer,input))
         return frame
 
     else:
-        # loop_i = 23
-        frame_in = frame_buffer[(loop_i-frame_move):(loop_i-frame_move)+frame_length]
+        if loop_i == 1:
+            frame_buffer = frame_buffer[0:128]
+        else:
+            frame_buffer = frame_buffer[-128:]
+        # print(frame_buffer)
+        frame_buffer = np.concatenate((frame_buffer,input))
+        frame_in = frame_buffer
         frame_out = np.concatenate((frame_out[frame_move:], np.zeros((frame_move,))))
-        
         Y = np.fft.fft(frame_in * win)
         Ya2 = np.power(abs(Y[0:N_eff]), 2)  
         Sf = np.convolve(win_freq.flatten(), Ya2.flatten()) 
@@ -83,7 +87,7 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = Non
         Sf = Sf[f_win_length:N_eff+f_win_length]  
         
         '''initialization'''
-        if (loop_i==frame_move):         
+        if (loop_i==1):         
             lambda_dav = lambda_d = Ya2  
             gamma = 1  
             GH1 = 1  
@@ -101,7 +105,7 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = Non
         GH1 = np.divide(eta,(1+eta))* np.exp(0.5* expint(v))
         S = alpha_s * S + (1-alpha_s) * Sf
         
-        if(loop_i<(frame_length+14*frame_move)):
+        if(loop_i < 30):
             Smin = S
             Smin_sw = S
 
@@ -121,7 +125,7 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = Non
         Sft = find_Sft(N_eff,conv_Y,conv_I,St)
         '''updated smoothed spec eq. 27'''
         St=alpha_s*St+(1-alpha_s)*Sft
-        if(loop_i<(frame_length+14*frame_move)):
+        if(loop_i < 30):
             Smint = St
             Smint_sw = St
         else:
@@ -138,23 +142,19 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = Non
         lambda_dav = alpha_dt * lambda_dav + (1-alpha_dt) * Ya2
         lambda_d = lambda_dav * beta
         
-        if l_mod_lswitch==Vwin:
+        if l_mod_lswitch  == 2*Vwin:
             '''reinitiate every Vwin frames'''
             l_mod_lswitch=0
-            if loop_i == Vwin * frame_move + frame_overlap:
+            try:
+                SW=np.concatenate((SW[1:Nwin],Smin_sw))  
+                Smin=np.amin(SW); 
+                Smin_sw=S;    
+                SWt=np.concatenate((SWt[1:Nwin],Smint_sw))
+                Smint=np.amin(SWt);  
+                Smint_sw=St;   
+            except:
                 SW= np.tile(S,(Nwin))
                 SWt= np.tile(St,(Nwin))
-            else:
-                try:
-                    SW=np.concatenate((SW[1:Nwin],Smin_sw))  
-                    Smin=np.amin(SW); 
-                    Smin_sw=S;    
-                    SWt=np.concatenate((SWt[1:Nwin],Smint_sw))
-                    Smint=np.amin(SWt);  
-                    Smint_sw=St;   
-                except:
-                    SW= np.tile(S,(Nwin))
-                    SWt= np.tile(St,(Nwin))
 
         l_mod_lswitch = l_mod_lswitch + 1
         
@@ -175,19 +175,11 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = Non
         X = np.concatenate((X,X_other_half))
 
         '''extend the anti-symmetric range of the spectum'''
-        frame_result = np.power(Cwin,2) * win * np.real(np.fft.ifft(X))
-        
+        frame_result = np.power(Cwin,2) * win * np.real(np.fft.ifft(X)) 
         frame_out = frame_out + frame_result
-        
-        if(loop_i==frame_move):  
-            temp = frame_out[0:frame_move]
-            frame_out_buffer = np.concatenate((frame_out_buffer,temp))
-            loop_i = loop_i + frame_move
-        else:
-            temp = frame_out[0:frame_move]
-            frame_out_buffer = np.concatenate((frame_out_buffer,temp))
-            frame_out_buffer[loop_i-frame_overlap:loop_i+frame_move-frame_overlap] = frame_out[0:frame_move]
-            loop_i = loop_i + frame_move
+
+        print(len(frame_out))
+        loop_i = loop_i + 1
 
     print(time.time()-start)
-    return (frame_out[0:frame_move]*0.6)
+    return (frame_out[0:frame_move]*0.7)
