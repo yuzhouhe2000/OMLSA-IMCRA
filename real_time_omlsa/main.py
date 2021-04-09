@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import scipy.signal
 import sounddevice as sd
 import threading
+import time
 import sys
 
 input1 = "p287_004.wav"
@@ -38,7 +39,7 @@ def audio_input():
         samplerate=sample_rate,
         channels=channels_in)
     stream_in.start()
-    while (LIVE == 1):
+    while (1):
         # TODO: NEED to pass the overflow and underflow information
         frame, overflow = stream_in.read(frame_move)
         buffer.append(frame)
@@ -47,6 +48,7 @@ def audio_input():
     return ('', 204)
 
 def denoiser_output():
+    global LIVE
     device_out = "Soundflower (2ch)"
     caps = query_devices(device_out, "output")
     channels_out = min(caps['max_output_channels'], 1)
@@ -56,19 +58,41 @@ def denoiser_output():
         channels=channels_out)
 
     stream_out.start()
-    while (LIVE == 1):
-        if buffer != []:
-            while len(buffer) > 10:
+    while(1):
+        while (LIVE == 1):
+            if buffer != []:
+                while len(buffer) > 10:
+                    del(buffer[0])
+                frame = buffer[0]
                 del(buffer[0])
-            frame = buffer[0]
-            del(buffer[0])
-            output = omlsa_streamer(frame,sample_rate, frame_length, frame_move,preprocess=None)
-            # stream_out.write(output)
+                output = omlsa_streamer(frame,sample_rate, frame_length, frame_move,preprocess=None)
+                stream_out.write(output.astype(np.float32))
+        while(LIVE == 0):
+            if buffer != []:
+                while len(buffer) > 10:
+                    del(buffer[0])
+                frame = buffer[0]
+                del(buffer[0])
+                stream_out.write(frame)
+
     stream_out.stop()
+
+def switch():
+    global LIVE
+    while(1):
+        if LIVE == 1:
+            input("Press Enter to continue...")
+            print("denoiser_off")
+            LIVE = 0
+        else:
+            input("Press Enter to continue...")
+            print("denoiser_on")
+            LIVE = 1
 
 threads = []
 threads.append(threading.Thread(target=audio_input))
 threads.append(threading.Thread(target=denoiser_output))
+threads.append(threading.Thread(target=switch))
 print(threads)
 
 if __name__ == '__main__':
