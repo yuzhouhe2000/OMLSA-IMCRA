@@ -6,6 +6,7 @@ import scipy.signal
 import matplotlib.pyplot as plt
 import time
 from utils import *
+from VAD import denoiser_VAD
 
 # OMLSA + IMCRA algorithm
 def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,high_cut = 15000):
@@ -159,12 +160,11 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
         
         temp = [0]*N_eff
 
-        qhat = find_qhat(N_eff,gamma_mint,gamma1,zeta0,zetat)
+        # qhat = find_qhat(N_eff,gamma_mint,gamma1,zeta0,zetat)
         
-        phat = find_phat(N_eff,gamma_mint,gamma1,zetat,zeta0,v,eta,qhat)
+        # phat = find_phat(N_eff,gamma_mint,gamma1,zetat,zeta0,v,eta,qhat)
 
-        
-
+        phat = denoiser_VAD(frame_in)
 
         alpha_dt = alpha_d + (1-alpha_d) * phat
         lambda_dav = alpha_dt * lambda_dav + (1-alpha_dt) * Ya2

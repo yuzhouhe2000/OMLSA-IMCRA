@@ -7,12 +7,26 @@ import matplotlib.pyplot as plt
 import time
 from utils import *
 
-# OMLSA + IMCRA algorithm
-def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,high_cut = 15000):
-    
+
+f_win_length = 1
+win_freq = np.array([0.25, 0.5, 0.25])
+alpha_eta = 0.92
+alpha_s = 0.9
+alpha_d = 0.85
+beta = 2
+eta_min = 0.0158
+GH0 = np.power(eta_min,0.5)
+gamma0 = 4.6
+gamma1 = 3
+zeta0 = 1.67
+Bmin = 1.66
+Vwin = 15
+Nwin = 8
+
+
+def omlsa_streamer(frame_in,fs,frame_length,frame_move,plot = None,preprocess = None,high_cut = 15000):
     start = time.time()
-    
-    input = bandpass(raw_input,preprocess,high_cut,fs)  # bandpass the signal
+    input = bandpass(frame_in,preprocess,high_cut,fs)  # bandpass the signal
 
     ############### Initialize the data ################
     data_length = len(input)
@@ -23,30 +37,13 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
     frame_out = np.zeros((frame_length, ))
     frame_result = np.zeros((frame_length, ))
     y_out_time = np.zeros((data_length, ))
+
+
     win = np.hamming(frame_length)
-    
-    ''' normalize hamming window '''
     win = win / (np.mean(np.power(win,2)) ** 0.5)
     Cwin = sum(np.power(win,2)) ** 0.5
     win = win / Cwin
-
-    f_win_length = 1
-    win_freq = np.array([0.25, 0.5, 0.25])
-    alpha_eta = 0.92
-    alpha_s = 0.9
-    alpha_d = 0.85
-    beta = 2
-    eta_min = 0.0158
-    GH0 = np.power(eta_min,0.5)
-    gamma0 = 4.6
-    gamma1 = 3
-    zeta0 = 1.67
-    Bmin = 1.66
     l_mod_lswitch = 0
-    Vwin = 15
-    Nwin = 8
-
-
     #################### Main Loop ####################
     '''OMLSA LOOP'''
     '''For all time frames'''
@@ -223,23 +220,4 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
             loop_i = loop_i + frame_move
 
     print(time.time()-start)
-    
-    # Choose between plot strategy
-    if plot == "f":
-        NFFT = 256
-        fig, axes = plt.subplots(nrows=2, ncols=1)
-        Pxx, freqs, bins, im = axes[0].specgram(raw_input,NFFT=NFFT, Fs=fs, noverlap = NFFT/2)
-        Pxx, freqs, bins, im = axes[1].specgram(y_out_time,NFFT=NFFT, Fs=fs, noverlap= NFFT/2)
-        fig.subplots_adjust(right=0.8)
-        cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-        fig.colorbar(im, cax=cbar_ax)
-        plt.show()
-
-    if plot == "t":
-        plt.subplot(2,1,1)
-        plt.plot(input)
-        plt.subplot(2,1,2)
-        plt.plot(y_out_time)
-        plt.show()
-
     return (y_out_time)
