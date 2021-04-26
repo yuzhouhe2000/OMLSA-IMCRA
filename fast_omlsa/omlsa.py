@@ -23,18 +23,7 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
     frame_out = np.zeros((frame_length, ))
     frame_result = np.zeros((frame_length, ))
     y_out_time = np.zeros((data_length, ))
-    win = np.hamming(frame_length)
-    win2 = np.power(win,2)
-    W0 = win2[0:frame_move]
-
-    for t in range(0,frame_length,frame_move):
-        '''circular shift for weight calculation'''
-        swin2 = circular_shift(win2,t)
-        W0 = W0 + swin2[0][0:frame_move]
-    ''' normalize hamming window '''
-    W0 = np.mean(W0) ** 0.5
-    # win = win / W0
-    
+    win = np.hamming(frame_length)    
     Cwin = sum(np.power(win,2)) ** 0.5
     win = win / Cwin
     f_win_length = 1

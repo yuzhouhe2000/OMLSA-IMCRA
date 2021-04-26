@@ -61,7 +61,7 @@ def denoiser_output():
                 del(buffer[0])
                 # print(len(buffer))
                 start = time.time()
-                output = omlsa_streamer(frame,sample_rate, frame_length, frame_move,postprocess= "butter",high_cut=19000)
+                output = omlsa_streamer(frame,sample_rate, frame_length, frame_move,postprocess= "butter",high_cut=3000)
                 print(time.time()-start)
                 stream_out.write(output.astype(np.float32))
         while(LIVE == 0):

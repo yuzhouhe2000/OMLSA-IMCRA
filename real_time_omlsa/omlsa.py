@@ -6,8 +6,7 @@ import scipy.signal
 import matplotlib.pyplot as plt
 import time
 from utils import *
-def find_nonzero(input):
-    return [i for i, e in enumerate(input) if e != 0]
+
 ############### Initialize the data ################
 # data_length = len(frame_buffer)
 f_win_length = 1
@@ -63,8 +62,7 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,postprocess = No
     start = time.time()
     input = frame
     input = input.reshape(frame_move,)
-
-
+    
     # #################### Core Algorithm ####################
     # '''OMLSA LOOP'''
     # '''For all time frames'''
@@ -187,7 +185,7 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,postprocess = No
                     SWt=np.concatenate((SWt[1:Nwin],Smint_sw))
                     Smint=np.amin(SWt);  
                     Smint_sw=St;  
-                     
+
                 # initialize
                 except:
                     SW= np.tile(S,(Nwin))
