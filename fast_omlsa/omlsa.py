@@ -6,8 +6,7 @@ import scipy.signal
 import matplotlib.pyplot as plt
 import time
 from utils import *
-def find_nonzero(input):
-    return [i for i, e in enumerate(input) if e != 0]
+
 # OMLSA + IMCRA algorithm
 def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,high_cut = 15000):
     
@@ -150,23 +149,24 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
         # conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
 # P2
         Sft = St
-        idx = find_nonzero(conv_I)
-        # I_f = reformat(np.array(I_f))
+        
+        # # I_f = reformat(np.array(I_f))
 
-        '''eq. 26'''
-        if idx != []:
-            for i in idx:
-                conv_Y = np.convolve(win_freq.flatten(), (I_f*Ya2).flatten())
+        conv_Y = np.convolve(win_freq.flatten(), (I_f*Ya2).flatten())
                 
                 # conv_Y = reformat(conv_Y) 
-                '''eq. 26'''
-                conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
-                Sft[i] = np.divide(conv_Y[i],conv_I[i])
+        '''eq. 26'''
+        conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
+        '''eq. 26'''
+        # idx = find_nonzero(conv_I)
+        # if idx != []:
+        #     for i in idx:
+        #         Sft[i] = np.divide(conv_Y[i],conv_I[i])
 
         Sft = find_Sft(N_eff,conv_Y,conv_I,St)
-             
         St=alpha_s*St+(1-alpha_s)*Sft
         '''updated smoothed spec eq. 27'''
+
         
         if(loop_i<(frame_length+14*frame_move)):
             Smint = St
@@ -187,9 +187,8 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
         qhat = find_qhat(N_eff,gamma_mint,gamma1,zeta0,zetat)
         
         phat = find_phat(N_eff,gamma_mint,gamma1,zetat,zeta0,v,eta,qhat)
-        # if loop_i >= 40*128:
-        #     print(phat)
-        #     return
+
+
         alpha_dt = alpha_d + (1-alpha_d) * phat
         lambda_dav = alpha_dt * lambda_dav + (1-alpha_dt) * Ya2
         lambda_d = lambda_dav * beta

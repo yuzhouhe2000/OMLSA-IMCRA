@@ -6,7 +6,8 @@ import scipy.signal
 import matplotlib.pyplot as plt
 import time
 from utils import *
-
+def find_nonzero(input):
+    return [i for i, e in enumerate(input) if e != 0]
 ############### Initialize the data ################
 # data_length = len(frame_buffer)
 f_win_length = 1
@@ -35,7 +36,7 @@ Smint = 0
 Smin_sw = 0
 SW = 0
 G = 0
-
+conv_Y = 0
 # Assume frame length = 256, frame_move = 128. Can change here
 frame_length = 256
 frame_move =128
@@ -58,7 +59,7 @@ l_mod_lswitch = 0
 zi = np.zeros((0, ))
 
 def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,postprocess = None,high_cut = 6000):
-    global loop_i,frame_buffer,frame_out,frame_in,frame_result,y_out_time,l_mod_lswitch,lambda_d,eta_2term,S,St,lambda_dav,Smin,Smin_sw,Smint_sw,Smint,zi,G
+    global loop_i,frame_buffer,frame_out,frame_in,frame_result,y_out_time,l_mod_lswitch,lambda_d,eta_2term,S,St,lambda_dav,Smin,Smin_sw,Smint_sw,Smint,zi,G,conv_Y
     start = time.time()
     input = frame
     input = input.reshape(frame_move,)
@@ -122,11 +123,21 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,postprocess = No
             conv_I = np.convolve(win_freq, I_f)
             conv_I = conv_I[f_win_length:N_eff+f_win_length]
             
-            '''eq. 26'''       
-            conv_Y = np.convolve(win_freq.flatten(), (I_f*Ya2).flatten())
-            conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
-            
-            Sft = find_Sft(N_eff,conv_Y,conv_I,St)
+            Sft = St
+            idx = find_nonzero(conv_I)
+            '''eq. 26'''
+            if idx != []:
+                for i in idx:
+                    conv_Y = np.convolve(win_freq.flatten(), (I_f*Ya2).flatten())
+                    
+                    # conv_Y = reformat(conv_Y) 
+                    '''eq. 26'''
+                    conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
+                    Sft[i] = np.divide(conv_Y[i],conv_I[i])
+
+            # Sft = find_Sft(N_eff,conv_Y,conv_I,St)
+                
+            St=alpha_s*St+(1-alpha_s)*Sft
             '''updated smoothed spec eq. 27'''
             St=alpha_s*St+(1-alpha_s)*Sft
             if(loop_i < 30):
