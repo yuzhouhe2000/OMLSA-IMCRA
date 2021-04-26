@@ -216,13 +216,9 @@ def omlsa(input,fs,plot = None):
 
         phat = np.divide(1,(1+np.divide(qhat,(1-qhat))*(1+eta) * np.exp(-v)))
         
-        # if loop_i >= 40*128:
-        #     print(phat)
-        #     return
         for i in range(0,N_eff):  
             if (gamma_mint[i] >=gama1 or zetat[i] >=zeta0):
                 phat[i] = 1
-
 
         alpha_dt = alpha_d + (1-alpha_d) * phat
 

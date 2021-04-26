@@ -9,8 +9,8 @@ from utils import *
 
 # OMLSA + IMCRA algorithm
 def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,high_cut = 15000):
-    
     start = time.time()
+    
     
     input = bandpass(raw_input,preprocess,high_cut,fs)  # bandpass the signal
 
@@ -58,6 +58,7 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
     '''OMLSA LOOP'''
     '''For all time frames'''
     while(loop_i+frame_length < data_length):
+        
         '''if is first iteration, initialize all the variables'''
         if(loop_i == 0):
             frame_in = input[0:frame_length]
@@ -135,39 +136,28 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
         I_f = np.zeros((N_eff, )) 
         I_f[gamma_min < gamma0] = 1
         I_f[zeta < zeta0] = 1
-
-    
+        
+        
         conv_I = np.convolve(win_freq, I_f)
         
         '''smooth'''
         conv_I = conv_I[f_win_length:N_eff+f_win_length]
         
-        # '''eq. 26'''       
-        # conv_Y = np.convolve(win_freq.flatten(), (I_f*Ya2).flatten())
-
-        # '''eq. 26'''
-        # conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
-# P2
         Sft = St
-        
-        # # I_f = reformat(np.array(I_f))
 
         conv_Y = np.convolve(win_freq.flatten(), (I_f*Ya2).flatten())
-                
-                # conv_Y = reformat(conv_Y) 
         '''eq. 26'''
         conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
-        '''eq. 26'''
-        # idx = find_nonzero(conv_I)
-        # if idx != []:
-        #     for i in idx:
-        #         Sft[i] = np.divide(conv_Y[i],conv_I[i])
-
-        Sft = find_Sft(N_eff,conv_Y,conv_I,St)
+        
+        Sft = St
+        Sft = np.divide(conv_Y,conv_I)
+        Sft[(conv_I) == 0] = St[(conv_I) == 0]
+        
         St=alpha_s*St+(1-alpha_s)*Sft
         '''updated smoothed spec eq. 27'''
 
         
+
         if(loop_i<(frame_length+14*frame_move)):
             Smint = St
             Smint_sw = St
@@ -183,11 +173,17 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
         '''eq. 29 init p(speech active|gama)'''
         
         temp = [0]*N_eff
-
-        qhat = find_qhat(N_eff,gamma_mint,gamma1,zeta0,zetat)
+            
+        qhat = (gamma1-gamma_mint) / (gamma1-1)
+        qhat[gamma_mint<1] = 1
+        qhat[gamma_mint<gamma1] = 1
+        qhat[zetat<zeta0] = 1          
+        qhat[gamma_mint >= gamma1] = 0
+        qhat[zetat >= zeta0] = 0
         
-        phat = find_phat(N_eff,gamma_mint,gamma1,zetat,zeta0,v,eta,qhat)
-
+        phat = np.divide(1,(1+np.divide(qhat,(1-qhat))*(1+eta) * np.exp(-v)))
+        phat[gamma_mint >=gamma1] = 1
+        phat[zetat >=zeta0] = 1
 
         alpha_dt = alpha_d + (1-alpha_d) * phat
         lambda_dav = alpha_dt * lambda_dav + (1-alpha_dt) * Ya2
@@ -211,11 +207,11 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
         
         gamma = np.divide(Ya2 , np.maximum(lambda_d, 1e-10)) 
         '''update instant SNR'''
+        
 
         eta = alpha_eta * eta_2term + (1-alpha_eta) * np.maximum(gamma-1, 0)
         
         eta[eta<eta_min] = eta_min
-
 
         v = np.divide(gamma * eta , (1+eta))
 
@@ -234,22 +230,20 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
         X = np.concatenate((X,X_other_half))
 
         '''extend the anti-symmetric range of the spectum'''
+        
         temp = np.real(np.fft.ifft(X))
 
         frame_result = win * temp * Cwin * Cwin
 
         frame_out = frame_out + frame_result
             
-
         if(loop_i==0):
             y_out_time[loop_i:loop_i+frame_move] = frame_out[0:frame_move]
             loop_i = loop_i + frame_length
         else:
             y_out_time[loop_i-frame_overlap:loop_i+frame_move-frame_overlap] = frame_out[0:frame_move]
             loop_i = loop_i + frame_move
-
     print(time.time()-start)
-    
     # Choose between plot strategy
     if plot == "f":
         NFFT = 256
@@ -267,5 +261,5 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
         plt.subplot(2,1,2)
         plt.plot(y_out_time)
         plt.show()
-
+    
     return (y_out_time)

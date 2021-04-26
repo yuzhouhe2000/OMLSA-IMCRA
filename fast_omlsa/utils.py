@@ -1,7 +1,6 @@
 # Some helper functions
 import numpy as np
 import scipy.special
-from numba import njit, prange
 from scipy.signal import butter, lfilter
 
 
@@ -12,33 +11,6 @@ def expint(v):
 # Circular shift of an array
 def circular_shift(x,t):
     return [x[t:len(x)], x[0:t]]
-
-@njit(fastmath=True, cache=True)
-def find_Sft(N_eff,conv_Y,conv_I,St):
-    Sft = St
-    for i in range(0,N_eff):
-        if int(conv_I[i]) != 0:
-            Sft[i] = np.divide(conv_Y[i],conv_I[i])
-    return Sft
-
-@njit(fastmath=True, cache=True)
-def find_qhat(N_eff,gamma_mint,gamma1,zeta0,zetat):
-    qhat = np.ones((N_eff, ))
-    # for i in range(0,N_eff):
-    #     if (gamma_mint[i]>1 and gamma_mint[i]<gamma1 and zetat[i]<zeta0):
-    #         qhat[i] = (gamma1-gamma_mint[i]) / (gamma1-1)
-    # print(qhat)
-    return qhat
-
-@njit(fastmath=True, cache=True)
-def find_phat(N_eff,gamma_mint,gamma1,zetat,zeta0,v,eta,qhat):
-    phat = np.zeros((N_eff, ))  
-    phat = np.divide(1,(1+np.divide(qhat,(1-qhat))*(1+eta) * np.exp(-v)))
-    for i in range(0,N_eff):  
-        if (gamma_mint[i] >=gamma1 or zetat[i] >=zeta0):
-            phat[i] = 1
-    # print(phat)
-    return phat
 
 def butter_bandpass(lowcut, highcut, fs, order=5):
     nyq = 0.5 * fs
