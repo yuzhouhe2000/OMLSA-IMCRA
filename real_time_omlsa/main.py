@@ -88,7 +88,7 @@ def switch():
 threads = []
 threads.append(threading.Thread(target=audio_input))
 threads.append(threading.Thread(target=denoiser_output))
-threads.append(threading.Thread(targset=switch))
+threads.append(threading.Thread(target=switch))
 print(threads)
 
 if __name__ == '__main__':

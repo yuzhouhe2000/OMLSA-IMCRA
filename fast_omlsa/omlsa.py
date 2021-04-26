@@ -174,6 +174,7 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
         
         temp = [0]*N_eff
             
+        # find prior probability of speech presence
         qhat = (gamma1-gamma_mint) / (gamma1-1)
         qhat[gamma_mint<1] = 1
         qhat[gamma_mint<gamma1] = 1
