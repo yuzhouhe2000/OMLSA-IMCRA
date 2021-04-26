@@ -34,6 +34,7 @@ Smint_sw = 0
 Smint = 0
 Smin_sw = 0
 SW = 0
+G = 0
 
 # Assume frame length = 256, frame_move = 128. Can change here
 frame_length = 256
@@ -41,7 +42,7 @@ frame_move =128
 N_eff = int(frame_length / 2 + 1)
 frame_overlap = frame_length - frame_move
 win = np.hamming(frame_length)
-win = win / (np.mean(np.power(win,2)) ** 0.5)
+# win = win / (np.mean(np.power(win,2)) ** 0.5)
 Cwin = sum(np.power(win,2)) ** 0.5
 win = win / Cwin
 N_eff = int(frame_length / 2 + 1)
@@ -54,19 +55,19 @@ frame_out = np.zeros((frame_length, ))
 frame_result = np.zeros((frame_length, ))
 y_out_time = np.zeros((data_length, ))
 l_mod_lswitch = 0
+zi = np.zeros((0, ))
 
-
-def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = None,high_cut = 12000):
-    global loop_i,frame_buffer,frame_out,frame_in,frame_result,y_out_time,l_mod_lswitch,lambda_d,eta_2term,S,St,lambda_dav,Smin,Smin_sw,Smint_sw,Smint
+def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,postprocess = None,high_cut = 6000):
+    global loop_i,frame_buffer,frame_out,frame_in,frame_result,y_out_time,l_mod_lswitch,lambda_d,eta_2term,S,St,lambda_dav,Smin,Smin_sw,Smint_sw,Smint,zi,G
     start = time.time()
-    input = bandpass(frame,preprocess,high_cut,fs)  # bandpass the signal
+    input = frame
     input = input.reshape(frame_move,)
-    
-    #################### Core Algorithm ####################
 
-    '''OMLSA LOOP'''
-    '''For all time frames'''
-    if loop_i == 0:
+
+    # #################### Core Algorithm ####################
+    # '''OMLSA LOOP'''
+    # '''For all time frames'''
+    if loop_i < 1:
         loop_i  = loop_i + 1
         frame_buffer = np.concatenate((frame_buffer,input))
         return frame
@@ -84,6 +85,7 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = Non
         Ya2 = np.power(abs(Y[0:N_eff]), 2)  
         Sf = np.convolve(win_freq.flatten(), Ya2.flatten()) 
         '''frequency smoothing '''
+
         Sf = Sf[f_win_length:N_eff+f_win_length]  
         
         '''initialization'''
@@ -94,79 +96,78 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = Non
             eta_2term = np.power(GH1,2) * gamma
             S = Smin = St = Smint = Smin_sw = Smint_sw = Sf  
             
-        # return
-        '''instant SNR'''  
-        gamma = np.divide(Ya2 ,np.maximum(lambda_d, 1e-10))
-    
-        ''' update smoothed SNR, eq.18, where eta_2term = GH1 .^ 2 .* gamma''' 
-        eta = alpha_eta * eta_2term + (1-alpha_eta) * np.maximum((gamma-1), 0)
-        eta = np.maximum(eta, eta_min)
-        v = np.divide(gamma * eta, (1+eta))
-        GH1 = np.divide(eta,(1+eta))* np.exp(0.5* expint(v))
-        S = alpha_s * S + (1-alpha_s) * Sf
+        # if (loop_i < 30) or (loop_i % 2 == 1):
+        if True:
+            '''instant SNR'''  
+            gamma = np.divide(Ya2 ,np.maximum(lambda_d, 1e-10))
         
-        if(loop_i < 30):
-            Smin = S
-            Smin_sw = S
+            ''' update smoothed SNR, eq.18, where eta_2term = GH1 .^ 2 .* gamma''' 
+            eta = alpha_eta * eta_2term + (1-alpha_eta) * np.maximum((gamma-1), 0)
+            eta = np.maximum(eta, eta_min)
+            v = np.divide(gamma * eta, (1+eta))
+            GH1 = np.divide(eta,(1+eta))* np.exp(0.5* expint(v))
+            S = alpha_s * S + (1-alpha_s) * Sf
+            
+            if(loop_i < 30):
+                Smin = S
+                Smin_sw = S
 
-        else:
-            Smin = np.minimum(Smin,S)
-            Smin_sw = np.minimum(Smin_sw, S)
+            else:
+                Smin = np.minimum(Smin,S)
+                Smin_sw = np.minimum(Smin_sw, S)
 
-        gamma_min = np.divide((Ya2 / Bmin),Smin)
-        zeta = np.divide(S/Bmin,Smin)
-        I_f = find_I_f(N_eff,gamma0,zeta,zeta0,gamma_min)
-        conv_I = np.convolve(win_freq, I_f)
-        conv_I = conv_I[f_win_length:N_eff+f_win_length]
-        
-        '''eq. 26'''       
-        conv_Y = np.convolve(win_freq.flatten(), (I_f*Ya2).flatten())
-        conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
-        Sft = find_Sft(N_eff,conv_Y,conv_I,St)
-        '''updated smoothed spec eq. 27'''
-        St=alpha_s*St+(1-alpha_s)*Sft
-        if(loop_i < 30):
-            Smint = St
-            Smint_sw = St
-        else:
-            Smint = np.minimum(Smint, St)
-            Smint_sw = np.minimum(Smint_sw, St)
-        
-        gamma_mint = np.divide(Ya2/Bmin, Smint)
-        zetat = np.divide(S/Bmin, Smint)
-        '''eq. 29 speech absence probability'''
-        temp = [0]*N_eff
-        qhat = find_qhat(N_eff,gamma_mint,gamma1,zeta0,zetat)
-        phat = find_phat(N_eff,gamma_mint,gamma1,zetat,zeta0,v,eta,qhat)
-        alpha_dt = alpha_d + (1-alpha_d) * phat
-        lambda_dav = alpha_dt * lambda_dav + (1-alpha_dt) * Ya2
-        lambda_d = lambda_dav * beta
-        
-        if l_mod_lswitch  == 2*Vwin:
-            '''reinitiate every Vwin frames'''
-            l_mod_lswitch=0
-            try:
-                SW=np.concatenate((SW[1:Nwin],Smin_sw))  
-                Smin=np.amin(SW); 
-                Smin_sw=S;    
-                SWt=np.concatenate((SWt[1:Nwin],Smint_sw))
-                Smint=np.amin(SWt);  
-                Smint_sw=St;   
-            except:
-                SW= np.tile(S,(Nwin))
-                SWt= np.tile(St,(Nwin))
+            gamma_min = np.divide((Ya2 / Bmin),Smin)
+            zeta = np.divide(S/Bmin,Smin)
+            I_f = find_I_f(N_eff,gamma0,zeta,zeta0,gamma_min)
+            conv_I = np.convolve(win_freq, I_f)
+            conv_I = conv_I[f_win_length:N_eff+f_win_length]
+            
+            '''eq. 26'''       
+            conv_Y = np.convolve(win_freq.flatten(), (I_f*Ya2).flatten())
+            conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
+            
+            Sft = find_Sft(N_eff,conv_Y,conv_I,St)
+            '''updated smoothed spec eq. 27'''
+            St=alpha_s*St+(1-alpha_s)*Sft
+            if(loop_i < 30):
+                Smint = St
+                Smint_sw = St
+            else:
+                Smint = np.minimum(Smint, St)
+                Smint_sw = np.minimum(Smint_sw, St)
+            
+            gamma_mint = np.divide(Ya2/Bmin, Smint)
+            zetat = np.divide(S/Bmin, Smint)
+            '''eq. 29 speech absence probability'''
+            temp = [0]*N_eff
+            qhat = find_qhat(N_eff,gamma_mint,gamma1,zeta0,zetat)
+            phat = find_phat(N_eff,gamma_mint,gamma1,zetat,zeta0,v,eta,qhat)
+            alpha_dt = alpha_d + (1-alpha_d) * phat
+            lambda_dav = alpha_dt * lambda_dav + (1-alpha_dt) * Ya2
+            lambda_d = lambda_dav * beta
+            
+            if l_mod_lswitch  == 2*Vwin:
+                '''reinitiate every Vwin frames'''
+                l_mod_lswitch=0
+                try:
+                    SW=np.concatenate((SW[1:Nwin],Smin_sw))  
+                    Smin=np.amin(SW); 
+                    Smin_sw=S;    
+                    SWt=np.concatenate((SWt[1:Nwin],Smint_sw))
+                    Smint=np.amin(SWt);  
+                    Smint_sw=St;   
+                except:
+                    SW= np.tile(S,(Nwin))
+                    SWt= np.tile(St,(Nwin))
 
-        l_mod_lswitch = l_mod_lswitch + 1
-        
-        gamma = np.divide(Ya2 , np.maximum(lambda_d, 1e-10)) 
-        '''update instant SNR'''
-        # print(eta_2term)
-        # return
-        eta = update_eta(N_eff,eta,eta_min,alpha_eta,eta_2term,gamma)
-        v = np.divide(gamma * eta , (1+eta))
-        GH1 = np.divide(eta , (1+eta))* np.exp(0.5 * expint(v))
-        G = np.power(GH1 , phat) * np.power(GH0 , (1-phat))
-        eta_2term = np.power(GH1 , 2) * gamma  
+            l_mod_lswitch = l_mod_lswitch + 1
+            gamma = np.divide(Ya2 , np.maximum(lambda_d, 1e-10)) 
+            '''update instant SNR'''
+            eta = update_eta(N_eff,eta,eta_min,alpha_eta,eta_2term,gamma)
+            v = np.divide(gamma * eta , (1+eta))
+            GH1 = np.divide(eta , (1+eta))* np.exp(0.5 * expint(v))
+            G = np.power(GH1 , phat) * np.power(GH0 , (1-phat))
+            eta_2term = np.power(GH1 , 2) * gamma  
         '''eq. 18'''
         X = np.concatenate((np.zeros((3,)), (G[3:N_eff-1])*(Y[3:N_eff-1]),[0]))
         X_2 = X[1:N_eff-1]
@@ -175,11 +176,11 @@ def omlsa_streamer(frame,fs,frame_length,frame_move,plot = None,preprocess = Non
         X = np.concatenate((X,X_other_half))
 
         '''extend the anti-symmetric range of the spectum'''
-        frame_result = np.power(Cwin,2) * win * np.real(np.fft.ifft(X)) 
+        frame_result = Cwin*Cwin*win * np.real(np.fft.ifft(X)) 
         frame_out = frame_out + frame_result
-
-        print(len(frame_out))
+        output,zi = bandpass(frame_out[0:frame_move],postprocess,high_cut,fs,zi)  # bandpass the signal
+        # print(len(frame_out))
         loop_i = loop_i + 1
 
-    print(time.time()-start)
-    return (frame_out[0:frame_move]*0.7)
+    # print(time.time()-start)
+    return (output)

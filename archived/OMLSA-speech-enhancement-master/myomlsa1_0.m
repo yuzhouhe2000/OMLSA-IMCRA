@@ -14,9 +14,9 @@ clear
 
 % [vocal2,fs] = audioread('input5.mp3');
 y_in_orig = vocal(:,1);
-y_in_orig(1:30000) = y_in_orig(1:30000) + noise * 0.3;
-y_in_orig(30001:60000) = y_in_orig(30001:60000) + noise2 * 0.3;
-y_in_orig(60001:90000) = y_in_orig(60001:90000) + noise3 * 0.3;
+% y_in_orig(1:30000) = y_in_orig(1:30000) + noise * 0.3;
+% y_in_orig(30001:60000) = y_in_orig(30001:60000) + noise2 * 0.3;
+% y_in_orig(60001:90000) = y_in_orig(60001:90000) + noise3 * 0.3;
 
 % [y_in_orig, fs0] = audioread('example_in.wav');
 fs = 16e3;

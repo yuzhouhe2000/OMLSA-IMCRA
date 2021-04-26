@@ -9,10 +9,6 @@ import threading
 import time
 import sys
 
-input1 = "p287_004.wav"
-input2 = "p287_005.wav"
-input_dst = "input.wav"
-out_dst = "out.wav"
 
 buffer = []
 LIVE = 1
@@ -40,7 +36,6 @@ def audio_input():
         channels=channels_in)
     stream_in.start()
     while (1):
-        # TODO: NEED to pass the overflow and underflow information
         frame, overflow = stream_in.read(frame_move)
         buffer.append(frame)
         
@@ -64,8 +59,10 @@ def denoiser_output():
                     del(buffer[0])
                 frame = buffer[0]
                 del(buffer[0])
-                print(len(buffer))
-                output = omlsa_streamer(frame,sample_rate, frame_length, frame_move,preprocess="butter")
+                # print(len(buffer))
+                start = time.time()
+                output = omlsa_streamer(frame,sample_rate, frame_length, frame_move,postprocess= "butter",high_cut=19000)
+                print(time.time()-start)
                 stream_out.write(output.astype(np.float32))
         while(LIVE == 0):
             if buffer != []:

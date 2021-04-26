@@ -16,13 +16,12 @@ y1 = (y1 / 32767).astype(np.float)
 # y2 = (y2 / 32767).astype(np.float)
 
 # y1 = scipy.signal.resample(y1, int(len(y1)/16000*44100))
-white_noise = np.random.normal(0,0.005,len(y1))
+white_noise = np.random.normal(0,0.05,len(y1))
 # y_combine = y1 + y2[0:len(y1)]*0.6
 y_combine = y1 + white_noise
 write(input_dst,fs,y_combine)
 # choose between f (frequency domain plot), t (time domain plot), or None
 # can also set up high cut, default is 15000
-repeated = np.tile(y_combine,10)
-output = omlsa(repeated,fs, frame_length = 256, frame_move = 128-32, plot = "f",preprocess = None)
+output = omlsa(y_combine,fs, frame_length = 256, frame_move = 128, plot = "f",preprocess = None)
 write(out_dst,fs,output) 
 print("done")

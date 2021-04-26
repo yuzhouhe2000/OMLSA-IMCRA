@@ -35,7 +35,7 @@ def circular_shift(x,t):
 def omlsa(input,fs,plot = None):
     start = time.time()
     data_length = len(input)
-    frame_length = 512
+    frame_length = 256
     frame_move = 128
     frame_overlap = frame_length - frame_move
     N_eff = int(frame_length / 2 + 1)
@@ -101,10 +101,12 @@ def omlsa(input,fs,plot = None):
         Ya2 = np.power(abs(Y[0:N_eff]), 2)  
         '''spec estimation using single frame info.'''
 
+
         Sf = np.convolve(win_freq.flatten(), Ya2.flatten())  
         Sf = reformat(Sf)
         '''frequency smoothing '''
         Sf = Sf[f_win_length:N_eff+f_win_length]  
+
 
         '''initialization'''
         if (loop_i==0):         
@@ -198,11 +200,12 @@ def omlsa(input,fs,plot = None):
         
         gamma_mint = np.divide(Ya2/Bmin, Smint)
         zetat = np.divide(S/Bmin, Smint)
+
         qhat = np.ones((N_eff, 1))
         '''eq. 29 speech absence probability'''
         phat = np.zeros((N_eff, 1))  
         '''eq. 29 init p(speech active|gama)'''
-        
+
         temp = [0]*N_eff
         for i in range(0,N_eff):
             if (gamma_mint[i]>1 and gamma_mint[i]<gama1 and zetat[i]<zeta0):
@@ -212,10 +215,14 @@ def omlsa(input,fs,plot = None):
                 qhat[i] = 0
 
         phat = np.divide(1,(1+np.divide(qhat,(1-qhat))*(1+eta) * np.exp(-v)))
-
+        
+        # if loop_i >= 40*128:
+        #     print(phat)
+        #     return
         for i in range(0,N_eff):  
             if (gamma_mint[i] >=gama1 or zetat[i] >=zeta0):
                 phat[i] = 1
+
 
         alpha_dt = alpha_d + (1-alpha_d) * phat
 
@@ -249,6 +256,7 @@ def omlsa(input,fs,plot = None):
         eta = alpha_eta * eta_2term + (1-alpha_eta) * np.maximum(gamma-1, 0)
         '''update smoothed SNR, eq. 32 where eta_2term = GH1 .^ 2 .* gamma '''
 
+
         for i in range(0,N_eff):
             if eta[i] < eta_min:
                 eta[i] = eta_min
@@ -275,8 +283,8 @@ def omlsa(input,fs,plot = None):
 
         frame_result = np.power(Cwin,2) * win * temp
         frame_result = frame_result.reshape(len(frame_result),1)
-
         frame_out = frame_out + frame_result
+
 
         if(loop_i==0):
             y_out_time[loop_i:loop_i+frame_move] = frame_out[0:frame_move]
@@ -292,9 +300,9 @@ def omlsa(input,fs,plot = None):
     if plot == "f":
         NFFT = 256
         fig, axes = plt.subplots(nrows=2, ncols=1)
-        Pxx, freqs, bins, im = axes[0].specgram(input,NFFT=NFFT, Fs=fs, noverlap = NFFT/2, vmin= -80)
+        Pxx, freqs, bins, im = axes[0].specgram(input,NFFT=NFFT, Fs=fs, noverlap = NFFT/2, vmin= -100)
         y_out_time_reshape  = y_out_time.reshape(len(y_out_time),)
-        Pxx, freqs, bins, im = axes[1].specgram(y_out_time_reshape,NFFT=NFFT, Fs=fs, noverlap= NFFT/2,vmin= -80)
+        Pxx, freqs, bins, im = axes[1].specgram(y_out_time_reshape,NFFT=NFFT, Fs=fs, noverlap= NFFT/2,vmin= -100)
         fig.subplots_adjust(right=0.8)
         cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
         fig.colorbar(im, cax=cbar_ax)

@@ -6,7 +6,8 @@ import scipy.signal
 import matplotlib.pyplot as plt
 import time
 from utils import *
-
+def find_nonzero(input):
+    return [i for i, e in enumerate(input) if e != 0]
 # OMLSA + IMCRA algorithm
 def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,high_cut = 15000):
     
@@ -24,12 +25,19 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
     frame_result = np.zeros((frame_length, ))
     y_out_time = np.zeros((data_length, ))
     win = np.hamming(frame_length)
-    
+    win2 = np.power(win,2)
+    W0 = win2[0:frame_move]
+
+    for t in range(0,frame_length,frame_move):
+        '''circular shift for weight calculation'''
+        swin2 = circular_shift(win2,t)
+        W0 = W0 + swin2[0][0:frame_move]
     ''' normalize hamming window '''
-    win = win / (np.mean(np.power(win,2)) ** 0.5)
+    W0 = np.mean(W0) ** 0.5
+    # win = win / W0
+    
     Cwin = sum(np.power(win,2)) ** 0.5
     win = win / Cwin
-
     f_win_length = 1
     win_freq = np.array([0.25, 0.5, 0.25])
     alpha_eta = 0.92
@@ -123,20 +131,37 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
         gamma_min = np.divide((Ya2 / Bmin),Smin)
         zeta = np.divide(S/Bmin,Smin)
 
-        
-        
-        I_f = find_I_f(N_eff,gamma0,zeta,zeta0,gamma_min)
 
+# P1
+        I_f = np.zeros((N_eff, )) 
+        I_f[gamma_min < gamma0] = 1
+        I_f[zeta < zeta0] = 1
+
+    
         conv_I = np.convolve(win_freq, I_f)
         
         '''smooth'''
         conv_I = conv_I[f_win_length:N_eff+f_win_length]
         
-        '''eq. 26'''       
-        conv_Y = np.convolve(win_freq.flatten(), (I_f*Ya2).flatten())
+        # '''eq. 26'''       
+        # conv_Y = np.convolve(win_freq.flatten(), (I_f*Ya2).flatten())
+
+        # '''eq. 26'''
+        # conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
+# P2
+        Sft = St
+        idx = find_nonzero(conv_I)
+        # I_f = reformat(np.array(I_f))
 
         '''eq. 26'''
-        conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
+        if idx != []:
+            for i in idx:
+                conv_Y = np.convolve(win_freq.flatten(), (I_f*Ya2).flatten())
+                
+                # conv_Y = reformat(conv_Y) 
+                '''eq. 26'''
+                conv_Y = conv_Y[f_win_length:N_eff+f_win_length]
+                Sft[i] = np.divide(conv_Y[i],conv_I[i])
 
         Sft = find_Sft(N_eff,conv_Y,conv_I,St)
              
@@ -162,15 +187,13 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
         qhat = find_qhat(N_eff,gamma_mint,gamma1,zeta0,zetat)
         
         phat = find_phat(N_eff,gamma_mint,gamma1,zetat,zeta0,v,eta,qhat)
-
-        
-
-
+        # if loop_i >= 40*128:
+        #     print(phat)
+        #     return
         alpha_dt = alpha_d + (1-alpha_d) * phat
         lambda_dav = alpha_dt * lambda_dav + (1-alpha_dt) * Ya2
         lambda_d = lambda_dav * beta
         
-
         if l_mod_lswitch==Vwin:
             '''reinitiate every Vwin frames'''
             l_mod_lswitch=0
@@ -190,7 +213,10 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
         gamma = np.divide(Ya2 , np.maximum(lambda_d, 1e-10)) 
         '''update instant SNR'''
 
-        eta = update_eta(N_eff,eta,eta_min,alpha_eta,eta_2term,gamma)
+        eta = alpha_eta * eta_2term + (1-alpha_eta) * np.maximum(gamma-1, 0)
+        
+        eta[eta<eta_min] = eta_min
+
 
         v = np.divide(gamma * eta , (1+eta))
 
@@ -211,10 +237,11 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
         '''extend the anti-symmetric range of the spectum'''
         temp = np.real(np.fft.ifft(X))
 
-        frame_result = np.power(Cwin,2) * win * temp
+        frame_result = win * temp * Cwin * Cwin
 
         frame_out = frame_out + frame_result
-        
+            
+
         if(loop_i==0):
             y_out_time[loop_i:loop_i+frame_move] = frame_out[0:frame_move]
             loop_i = loop_i + frame_length
@@ -228,8 +255,8 @@ def omlsa(raw_input,fs,frame_length,frame_move,plot = None,preprocess = None,hig
     if plot == "f":
         NFFT = 256
         fig, axes = plt.subplots(nrows=2, ncols=1)
-        Pxx, freqs, bins, im = axes[0].specgram(raw_input,NFFT=NFFT, Fs=fs, noverlap = NFFT/2)
-        Pxx, freqs, bins, im = axes[1].specgram(y_out_time,NFFT=NFFT, Fs=fs, noverlap= NFFT/2)
+        Pxx, freqs, bins, im = axes[0].specgram(raw_input,NFFT=NFFT, Fs=fs, noverlap = NFFT/2, vmin= -100)
+        Pxx, freqs, bins, im = axes[1].specgram(y_out_time,NFFT=NFFT, Fs=fs, noverlap= NFFT/2, vmin= -100)
         fig.subplots_adjust(right=0.8)
         cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
         fig.colorbar(im, cax=cbar_ax)

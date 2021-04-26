@@ -18,9 +18,8 @@ def circular_shift(x,t):
 @njit(fastmath=True, cache=True)
 def find_Sft(N_eff,conv_Y,conv_I,St):
     Sft = St
-    for i in range(0,N_eff):
-        if int(conv_I[i]) != 0:
-            Sft[i] = np.divide(conv_Y[i],conv_I[i])
+    conv_I[conv_I == 0] = 1
+    Sft = np.divide(conv_Y,conv_I)
     return Sft
 
 @njit(fastmath=True, cache=True)
@@ -34,15 +33,6 @@ def find_qhat(N_eff,gamma_mint,gamma1,zeta0,zetat):
     return qhat
 
 @njit(fastmath=True, cache=True)
-def update_eta(N_eff,eta,eta_min,alpha_eta,eta_2term,gamma):
-    eta = alpha_eta * eta_2term + (1-alpha_eta) * np.maximum(gamma-1, 0)
-    '''update smoothed SNR, eq. 32 where eta_2term = GH1 .^ 2 .* gamma '''
-    for i in range(0,N_eff):
-        if eta[i] < eta_min:
-            eta[i] = eta_min
-    return eta
-
-@njit(fastmath=True, cache=True)
 def find_phat(N_eff,gamma_mint,gamma1,zetat,zeta0,v,eta,qhat):
     phat = np.zeros((N_eff, ))  
     phat = np.divide(1,(1+np.divide(qhat,(1-qhat))*(1+eta) * np.exp(-v)))
@@ -51,17 +41,24 @@ def find_phat(N_eff,gamma_mint,gamma1,zetat,zeta0,v,eta,qhat):
             phat[i] = 1
     return phat
 
+# @njit(fastmath=True, cache=True)
+# def find_I_f(N_eff,gamma0,zeta,zeta0,gamma_min):
+#     I_f = [0]*N_eff
+#     for i in range(0,N_eff):
+#         if(gamma_min[i] <gamma0 and zeta[i] < zeta0):
+#             I_f[i] = 1
+#         else:
+#             I_f[i] = 0
+#     return I_f
 
-@njit(fastmath=True, cache=True)
-def find_I_f(N_eff,gamma0,zeta,zeta0,gamma_min):
-    I_f = [0]*N_eff
-    for i in range(0,N_eff):
-        if(gamma_min[i] <gamma0 and zeta[i] < zeta0):
-            I_f[i] = 1
-        else:
-            I_f[i] = 0
-    return I_f
-
+# @njit(fastmath=True, cache=True)
+# def update_eta(N_eff,eta,eta_min,alpha_eta,eta_2term,gamma):
+#     eta = alpha_eta * eta_2term + (1-alpha_eta) * np.maximum(gamma-1, 0)
+#     '''update smoothed SNR, eq. 32 where eta_2term = GH1 .^ 2 .* gamma '''
+#     for i in range(0,N_eff):
+#         if eta[i] < eta_min:
+#             eta[i] = eta_min
+#     return eta
 
 def butter_bandpass(lowcut, highcut, fs, order=5):
     nyq = 0.5 * fs

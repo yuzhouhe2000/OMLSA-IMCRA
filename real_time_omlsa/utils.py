@@ -63,28 +63,24 @@ def find_I_f(N_eff,gamma0,zeta,zeta0,gamma_min):
     return I_f
 
 
-def butter_bandpass(lowcut, highcut, fs, order=5):
-    nyq = 0.5 * fs
-    low = lowcut / nyq
-    high = highcut / nyq
-    b, a = butter(order, [low, high], btype='band')
-    return b, a
+def butter_bandpass_filter(data,lowcut, highcut, fs, zi,order=4):
+    low = lowcut /(fs/2)
+    high = highcut /(fs/2)
+    sos = butter(order,high, btype='low',output = 'sos')
+    if len(zi) == 0:
+        zi = scipy.signal.sosfilt_zi(sos)
+    # print(zi)
+    data = data.reshape(len(data),)
+    y,zi = scipy.signal.sosfilt(sos, data,zi = zi)
+    return y,zi
 
 
-def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
-    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
-    y = lfilter(b, a, data)
-    return y
-
-
-def bandpass(raw_input,preprocess,high_cut,fs):
+def bandpass(raw_input,preprocess,high_cut,fs,zi):
     if (preprocess == "butter"):
-        input = butter_bandpass_filter(raw_input,20,high_cut,fs)
-        input = input / max(abs(input))
-    elif (preprocess == "ellip"):
-        sos = scipy.signal.ellip(4,5,40,[20/(fs/2),high_cut/(fs/2)],btype='bandpass', output='sos')
-        input = scipy.signal.sosfilt(sos, raw_input)
-        input = input / max(abs(input))
+        input,zi = butter_bandpass_filter(raw_input,20,high_cut,fs,zi)
+        
     else:
         input = raw_input
-    return input
+        zi = np.zeros((0,))
+
+    return input,zi

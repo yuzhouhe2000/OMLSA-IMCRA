@@ -15,9 +15,7 @@ fs, y1 = read(input1)
 
 y1 = (y1 / 32767).astype(np.float)
 
-fs,y2 = read(input2)
-y2 = (y2 / 32767).astype(np.float)
-white_noise = np.random.normal(0,0.15,len(y1))
+white_noise = np.random.normal(0,0.05,len(y1))
 
 # y_combine = y1 + y2[0:len(y1)]*0.1
 y_combine = y1 + white_noise
